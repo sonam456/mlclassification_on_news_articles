@@ -1,0 +1,612 @@
+---
+title: "Predicting Online News Article Popularity"
+author: "Sonam"
+output:
+  rmdformats::readthedown:
+    self_contained: true
+    thumbnails: false
+    lightbox: true
+    gallery: true
+    highlight: tango
+    toc: 3
+    toc_float: true
+    code_folding: hide
+    fig_width: 8 
+    fig_height: 5
+---
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+if (!require('pacman'))install.packages('pacman')
+pacman::p_load(DT, miscTools, caret, ROCR, pROC, e1071, C50,
+               rpart,rpart.plot, rattle, RColorBrewer, ggplot2,
+               dplyr,randomForest)
+```
+
+# Introduction
+
+The aim of this projecr is to explore a dataset in depth, apply a business analytics mindset to implement appropriate predictive analytics, and communicate the findings effectively.
+
+The dataset is comprised of some statistical measures on online news articles. Hence, this analysis builds a machine learning system on the dataset to predict the popularity of online news articles. The goal of the analysis is to use this system to configure and present future articles that sell more advertisement.
+
+
+# Dataset
+
+The dataset set comes from [UCI Machine Learning Repository: Online News Popularity Data Set](https://archive.ics.uci.edu/ml/datasets/Online+News+Popularity). This dataset summarizes a heterogeneous set of features about articles published by Mashable in a period of two years. The goal is to predict the number of shares in social networks (popularity).
+
+## Data Description
+
+Attribute Information:  
+
+     0. url:                           URL of the article
+     1. timedelta:                     Days between the article publication and the dataset acquisition
+     2. n_tokens_title:                Number of words in the title
+     3. n_tokens_content:              Number of words in the content
+     4. n_unique_tokens:               Rate of unique words in the content
+     5. n_non_stop_words:              Rate of non-stop words in the content
+     6. n_non_stop_unique_tokens:      Rate of unique non-stop words in the content
+     7. num_hrefs:                     Number of links
+     8. num_self_hrefs:                Number of links to other articles published by Mashable
+     9. num_imgs:                      Number of images
+    10. num_videos:                    Number of videos
+    11. average_token_length:          Average length of the words in the content
+    12. num_keywords:                  Number of keywords in the metadata
+    13. data_channel_is_lifestyle:     Is data channel 'Lifestyle'?
+    14. data_channel_is_entertainment: Is data channel 'Entertainment'?
+    15. data_channel_is_bus:           Is data channel 'Business'?
+    16. data_channel_is_socmed:        Is data channel 'Social Media'?
+    17. data_channel_is_tech:          Is data channel 'Tech'?
+    18. data_channel_is_world:         Is data channel 'World'?
+    19. kw_min_min:                    Worst keyword (min. shares)
+    20. kw_max_min:                    Worst keyword (max. shares)
+    21. kw_avg_min:                    Worst keyword (avg. shares)
+    22. kw_min_max:                    Best keyword (min. shares)
+    23. kw_max_max:                    Best keyword (max. shares)
+    24. kw_avg_max:                    Best keyword (avg. shares)
+    25. kw_min_avg:                    Avg. keyword (min. shares)
+    26. kw_max_avg:                    Avg. keyword (max. shares)
+    27. kw_avg_avg:                    Avg. keyword (avg. shares)
+    28. self_reference_min_shares:     Min. shares of referenced articles in Mashable
+    29. self_reference_max_shares:     Max. shares of referenced articles in Mashable
+    30. self_reference_avg_sharess:    Avg. shares of referenced articles in Mashable
+    31. weekday_is_monday:             Was the article published on a Monday?
+    32. weekday_is_tuesday:            Was the article published on a Tuesday?
+    33. weekday_is_wednesday:          Was the article published on a Wednesday?
+    34. weekday_is_thursday:           Was the article published on a Thursday?
+    35. weekday_is_friday:             Was the article published on a Friday?
+    36. weekday_is_saturday:           Was the article published on a Saturday?
+    37. weekday_is_sunday:             Was the article published on a Sunday?
+    38. is_weekend:                    Was the article published on the weekend?
+    39. LDA_00:                        Closeness to LDA topic 0
+    40. LDA_01:                        Closeness to LDA topic 1
+    41. LDA_02:                        Closeness to LDA topic 2
+    42. LDA_03:                        Closeness to LDA topic 3
+    43. LDA_04:                        Closeness to LDA topic 4
+    44. global_subjectivity:           Text subjectivity
+    45. global_sentiment_polarity:     Text sentiment polarity
+    46. global_rate_positive_words:    Rate of positive words in the content
+    47. global_rate_negative_words:    Rate of negative words in the content
+    48. rate_positive_words:           Rate of positive words among non-neutral tokens
+    49. rate_negative_words:           Rate of negative words among non-neutral tokens
+    50. avg_positive_polarity:         Avg. polarity of positive words
+    51. min_positive_polarity:         Min. polarity of positive words
+    52. max_positive_polarity:         Max. polarity of positive words
+    53. avg_negative_polarity:         Avg. polarity of negative  words
+    54. min_negative_polarity:         Min. polarity of negative  words
+    55. max_negative_polarity:         Max. polarity of negative  words
+    56. title_subjectivity:            Title subjectivity
+    57. title_sentiment_polarity:      Title polarity
+    58. abs_title_subjectivity:        Absolute subjectivity level
+    59. abs_title_sentiment_polarity:  Absolute polarity level
+    60. shares:                        Number of shares (target)
+
+
+
+# Importing the data 
+
+The data is imported into R and it comprises of 61 features.The 61st feature i.e. **shares** is the target variable i.e. an article is eligible for publishing or good enough to sell advertisement if the number of shares are more than 14000.
+
+
+```{r}
+news=read.csv("OnlineNewsPopularity/OnlineNewsPopularity.csv", stringsAsFactors = F)
+names(news)
+```
+
+# Explore and Clean the dataset
+
+To find the which of the remaining 60 features are best for predicting the **shares** we must inspect and look for patterns in the data through summaries and plots.
+
+## Exploration: Distributions of features 
+
+
+Lets check the distribution of values that each column takes.
+To do so we need to filter out the columns that have numeric values only and as seen from the result of `str(news)` below all the columns except `url` are numeric.
+
+```{r}
+str(news)
+```
+
+With `url` removed we also check if there are any nulls or NA in the data , turns out there arent any NULLs in the data. 
+
+```{r}
+is.null(news)
+
+par(mfrow= c(3,4))
+for(i in 2:length(news)){
+  hist(news[,i],main  = names(news)[i] ,xlab=names(news)[i])
+}
+```
+
+
+## Cleaning: Handle Categorical Data
+
+Looking at the distributions of  all the columns above we can conclude that all the columns 14-19 and 32-39 (see the names below) have binary data, hence it would be better to convert these into a factor.
+
+```{r}
+names(news)[c(14:19,32:39)]
+```
+
+Converting the columns mentioned above to factors.
+
+```{r}
+for (i in names(news)[c(14:19,32:39)]){
+  news[,i]<-factor(news[,i])
+}
+str(news[,names(news)[c(14:19,32:39)]])
+```
+
+
+
+## Cleaning: Handle Missing Data
+
+Missing values are coded as 0 in this dataset.Keeping apart the binary data columns there are around 3000 rows with missing data that needs to be cleaned first.
+
+
+Columns with missing data:
+
+```{r}
+names(news)[c(11,20,44,45,46,48,49,50,53)]
+```
+
+Total records vs no. of unclean records
+
+```{r}
+for(i in c(11,20,44,45,46,48,49,50,53))news_clean <- news[news[,i]!=0,]
+print(paste0("Total Records: ",nrow(news), 
+             " Unclean Records: ", nrow(news)-nrow(news_clean),
+             " i.e. ", 100*(nrow(news)-nrow(news_clean))/nrow(news), ' %' ))
+```
+
+
+Since the number of unclean rows is close to 3% , hence we can omit the bad rows.
+
+```{r}
+news <- news_clean
+```
+
+
+
+## Transforming: Handle Skewness in Distributions
+
+Some of the variables have heavily right skewed distributions, including the response `shares`. So we will transform them to reduce the skewness. For those variables with all values bigger than 0, we use log, and other variable with 0, we use square root to transform them.We are omitting the response `shares` here.
+
+Columns undergoing transformation:
+
+```{r}
+names(news)[c(3,7,8,9,10,27:30,40:43,47)]
+```
+
+
+```{r}
+backup<-news
+
+for(i in c(3,7,8,9,10,27:30,40:43,47)){
+  if(!sum(news[,i]==0)){
+    news[,i] <- log(news[,i]); 
+    #names(news)[i] <- paste("log_",names(news)[i], sep="")
+  }
+  else{
+    news[,i] <- sqrt(news[,i]); 
+    #names(news)[i] <- paste("sqrt_",names(news)[i], sep="")
+    }
+}
+
+
+DT::datatable(head(news,3))
+```
+
+
+## Exploration: Number of shares by the weekday
+
+Observing the pattern of number of shares on each week day, it was found that publishing day didn’t show much influence on shares. 
+We created a new categorical column called as `news_day` using the `weekday_is_*` columns to get all the days in a single column. This helped in formatting the patterns in the plot more efficiently.
+
+```{r}
+news$news_day <- rep("Sunday", nrow(news))
+news$news_day[news$weekday_is_monday==1] <- "Monday"
+news$news_day[news$weekday_is_tuesday==1] <- "Tuesday"
+news$news_day[news$weekday_is_wednesday==1] <- "Wednesday"
+news$news_day[news$weekday_is_thursday==1] <- "Thursday"
+news$news_day[news$weekday_is_friday==1] <- "Friday"
+news$news_day[news$weekday_is_saturday==1] <- "Saturday"
+news$news_day<-factor(news$news_day, levels = c('Sunday','Monday','Tuesday',
+                                                'Wednesday','Thursday','Friday',
+                                                'Saturday'))
+#Check 
+p1 <- ggplot(data=news, aes(news_day, log(shares)))
+p1 + geom_boxplot()
+news <- news[,-c(32:38,62)]
+
+```
+
+So we get rid of all the indicators but leave `is_weekend` because some difference is there bewtween weekdays and weekend data.
+
+## Exploration: Number of shares by publish tags
+
+Repeating the same process to find patterns in number of shares for different publish tags.
+
+```{r}
+news$data_channel <- rep("other", nrow(news))
+news$data_channel[news$data_channel_is_lifestyle==1] <- "Lifestyle"
+news$data_channel[news$data_channel_is_entertainment==1] <- "Entertainment"
+news$data_channel[news$data_channel_is_bus==1] <- "Bus"
+news$data_channel[news$data_channel_is_socmed==1] <- "Socmed"
+news$data_channel[news$data_channel_is_tech==1] <- "Tech"
+news$data_channel[news$data_channel_is_world==1] <- "World"
+news$data_channel<-factor(news$data_channel)
+#Check 
+p1 <- ggplot(data=news, aes(data_channel, log(shares)))
+p1 + geom_boxplot()
+```
+
+There are very mild variations in means with the data channels so we will keep these to see if they are significant.
+
+## Cleaning: Remove unwanted Columns
+
+Removing `datachannel` created for the plot above.
+```{r}
+news <- news[,-c(55)]
+```
+
+Also deleting the url and timedelta columns.
+
+```{r}
+news <- subset( news, select = -c(url, timedelta ) )
+```
+
+Deleting column `n_non_stop_words` since it has only one value , hence its a constant.
+
+```{r}
+news <- subset( news, select = -c(n_non_stop_words ) )
+```
+
+## Transformation: Generate binary response variable
+
+Define articles with shares larger than 1400 (median) as popular article.
+
+```{r}
+news$shares <- factor(ifelse(news$shares>1400,1,0))
+```
+
+# Modeling
+
+
+Since our target is a class i.e. 1 for a popular aricle and 0 for a non popular article , we will apply classification methods like Knn , Classification and Regression Trees,C5.0 Trees and Random Forests to train our data and predict on a test set. We will generate the training and test sets for the same.
+
+
+## Create Training and Test sets
+
+Split Train - 70%; Test - 30% and set a color palette for each method.
+
+```{r warning=FALSE,message=FALSE}
+#set random situation
+set.seed(100)
+# Select traning data and prediction data
+ind<-sample(2,nrow(news),replace=TRUE,prob=c(0.7,0.3))
+
+color.knn<-'#efab69'
+color.lda<-'#ab69ef'
+color.qda<-'#69adef'
+color.lr<-'#adef69'
+color.cart<-"#72E2FF"
+color.c50<-"#67B5DA"
+color.rf<-"#68B518"
+print(paste0('#Train: ', table(ind)[1],' #Test: ', table(ind)[2]))
+```
+
+
+## Check for collinearity 
+
+We need to see if any  numerical columms are collinear to each before applying our algorithms. 
+
+```{r}
+
+corDF = cor(news[ind==1,names(dplyr::select_if(news, is.numeric))]);
+dissimilarity <- 1 - abs(corDF);
+distance <- as.dist(dissimilarity);
+hc <- hclust(distance);  
+clusterV = cutree(hc,h=0.05);
+df<-as.data.frame(clusterV)
+df$columns<-rownames(df)
+knitr::kable(df[(df$clusterV==32),])
+DT::datatable(df)
+```
+
+
+
+From the cluster 32 we can see that  `rate_positive_words` and `rate_negative_words`. Hence, we reomve `rate_negative_words`
+
+```{r}
+news<-news[,-c(40)]
+DT::datatable(head(news))
+```
+
+
+
+
+## LDA
+
+Train the model on train set
+
+```{r}
+news.lda<- train(shares ~., method='lda', data=news[ind==1,])
+summary(news.lda)
+```
+
+Predict on test set 
+
+```{r}
+news.lda.pred <- predict( news.lda,news[ind==2,])
+news.lda.prob <- predict(news.lda,news[ind==2,],type='prob')
+```
+
+Confusion matrix for test set
+
+```{r}
+confusionMatrix(news.lda.pred, news[ind==2,]$shares)
+```
+
+ROC Curve
+
+```{r}
+news.lda.roc <- roc(news[ind==2,]$shares,news.lda.prob[,2])
+plot(news.lda.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1, 0.2),
+     grid.col=c("green", "red"), max.auc.polygon=TRUE,
+     auc.polygon.col=color.lda, print.thres=TRUE)
+
+```
+
+
+## QDA 
+
+Train the model on train set
+
+```{r}
+news.qda<- train(shares ~., method='qda', data=news[ind==1,])
+summary(news.qda)
+```
+
+Predict on test set 
+
+```{r}
+news.qda.pred <- predict( news.qda,news[ind==2,])
+news.qda.prob <- predict(news.qda,news[ind==2,],type='prob')
+```
+
+Confusion matrix for test set
+
+```{r}
+confusionMatrix(news.qda.pred, news[ind==2,]$shares)
+```
+
+ROC Curve
+
+```{r}
+news.qda.roc <- roc(news[ind==2,]$shares,news.qda.prob[,2])
+plot(news.qda.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1, 0.2),
+     grid.col=c("green", "red"), max.auc.polygon=TRUE,
+     auc.polygon.col=color.qda, print.thres=TRUE)
+```
+
+## Logistic Regression
+
+Train the model on train set
+
+```{r}
+
+news.lr<- train(shares ~., method='glm',family='binomial', data=news[ind==1,])
+summary(news.lr)
+```
+
+Predict on test set 
+
+```{r}
+news.lr.pred <- predict( news.lr,news[ind==2,])
+news.lr.prob <- predict(news.lr,news[ind==2,],type='prob')
+```
+
+Confusion matrix for test set
+
+```{r}
+confusionMatrix(news.lr.pred, news[ind==2,]$shares)
+```
+
+ROC Curve
+
+```{r}
+news.lr.roc <- roc(news[ind==2,]$shares,news.lr.prob[,2])
+plot(news.lr.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1, 0.2),
+     grid.col=c("green", "red"), max.auc.polygon=TRUE,
+     auc.polygon.col=color.lr, print.thres=TRUE)
+```
+
+## KNN
+
+Train the model on train set
+
+```{r}
+news.knn <- knn3(shares ~.,news[ind==1,])
+summary(news.knn)
+```
+
+Predict on test set 
+
+```{r}
+news.knn.pred <- predict( news.knn,news[ind==2,],type='class')
+news.knn.prob <- predict(news.knn,news[ind==2,],type='prob')
+```
+
+Confusion matrix for test set
+
+```{r}
+confusionMatrix(news.knn.pred, news[ind==2,]$shares)
+```
+
+ROC Curve
+
+```{r}
+news.knn.roc <- roc(news[ind==2,]$shares,news.knn.prob[,2])
+plot(news.knn.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1, 0.2),
+     grid.col=c("green", "red"), max.auc.polygon=TRUE,
+     auc.polygon.col=color.knn, print.thres=TRUE)
+
+```
+
+## CART
+
+Train the model on train set
+
+```{r}
+news.cart<-rpart(shares ~.,news[ind==1,],method='class')
+summary(news.cart)
+```
+
+Plot tree
+
+```{r}
+fancyRpartPlot(news.cart) 
+```
+
+Predict on test set 
+
+```{r}
+news.cart.pred<-predict( news.cart,news[ind==2,] ,type="class")
+news.cart.prob<-predict( news.cart,news[ind==2,] ,type="prob")
+```
+
+Confusion matrix for test set
+
+```{r}
+confusionMatrix(news.cart.pred, news[ind==2,]$shares)
+```
+
+ROC Curve
+
+```{r}
+news.cart.roc <- roc(news[ind==2,]$shares,news.cart.prob[,2])
+plot(news.cart.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1, 0.2),
+     grid.col=c("green", "red"), max.auc.polygon=TRUE,
+     auc.polygon.col=color.cart, print.thres=TRUE)
+
+
+```
+
+## C5.0
+
+Train the model on train set
+
+```{r}
+news.c50<-C5.0(shares ~.,news[ind==1,],method='class')
+summary(news.c50)
+```
+
+Predict on test set 
+
+```{r}
+news.c50.pred<-predict( news.c50,news[ind==2,] ,type="class")
+news.c50.prob<-predict( news.c50,news[ind==2,] ,type="prob")
+```
+
+Confusion matrix for test set
+
+```{r}
+confusionMatrix(news.c50.pred, news[ind==2,]$shares)
+```
+
+ROC Curve
+
+```{r}
+news.c50.roc <- roc(news[ind==2,]$shares,news.c50.prob[,2])
+plot(news.c50.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1, 0.2),
+     grid.col=c("green", "red"), max.auc.polygon=TRUE,
+     auc.polygon.col=color.cart, print.thres=TRUE)
+
+
+```
+
+## Random Forest
+
+Train the model on train set
+
+```{r}
+news.rf<-randomForest(shares ~.,news[ind==1,],method='class')
+summary(news.rf)
+```
+
+Plot number of trees vs error
+
+```{r}
+
+plot(news.rf)
+```
+
+Plot feature importance
+ 
+ 
+```{r}
+varImpPlot(news.rf)
+```
+
+Predict on test set 
+
+```{r}
+news.rf.pred<-predict( news.rf,news[ind==2,], type="class")
+news.rf.prob<-predict( news.rf,news[ind==2,], type="prob")
+```
+
+Confusion matrix for test set
+
+```{r}
+confusionMatrix(news.rf.pred, news[ind==2,]$shares)
+```
+
+ROC Curve
+
+```{r}
+news.rf.roc <- roc(news[ind==2,]$shares,news.rf.prob[,2])
+plot(news.rf.roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1, 0.2),
+     grid.col=c("green", "red"), max.auc.polygon=TRUE,
+     auc.polygon.col=color.cart, print.thres=TRUE)
+
+
+```
+
+
+## Model Comparison
+
+```{r}
+ROCCurve<-par(pty = "s")
+plot(performance(prediction(news.knn.prob[,2],news[ind==2,]$shares),'tpr','fpr'),
+     col=color.knn, lwd=3)
+text(0.55,0.6,"KNN",col=color.knn)
+plot(performance(prediction(news.cart.prob[,2],news[ind==2,]$shares),'tpr','fpr'),
+     col=color.cart, lwd=3, add=TRUE)
+text(0.3,0.4,"CART",col=color.cart)
+plot(performance(prediction(news.c50.prob[,2],news[ind==2,]$shares),'tpr','fpr'),
+     col=color.c50, lwd=3, add=TRUE)
+text(0.15,0.5,"C5.0",col=color.c50)
+plot(performance(prediction(news.rf.prob[,2],news[ind==2,]$shares),'tpr','fpr'),
+     col=color.rf, lwd=3, add=TRUE)
+text(0.3,0.7,"Random Forest",col=color.rf)
+```
